@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, Date, String
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, Date, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from app.database.connection import Base
@@ -12,6 +12,9 @@ class StockPrice(Base):
     """Represents historical or snapshot stock price data for a company."""
 
     __tablename__ = "stock_prices"
+    __table_args__ = (
+        UniqueConstraint("company_id", "date", name="uq_stock_price_company_date"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     company_id = Column(Integer, ForeignKey("companies.id", ondelete="CASCADE"), nullable=False, index=True)

@@ -1,3 +1,28 @@
 /myenv
 /.env
 .idea
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+
+# Test and tooling caches
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs and generated ETL snapshots
+logs/
+data/*.json
+
+# Virtual environments
+.venv/
+myenv/
+env/
