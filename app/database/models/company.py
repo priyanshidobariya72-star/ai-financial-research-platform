@@ -47,6 +47,7 @@ class Company(Base):
 
     stock_prices = relationship("StockPrice", back_populates="company", cascade="all, delete-orphan")
     financials = relationship("Financials", back_populates="company", cascade="all, delete-orphan")
+    news_articles = relationship("NewsArticle", back_populates="company", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Company(id={self.id}, symbol={self.symbol}, short_name={self.short_name})>"

@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.database.connection import Base
-from app.database.models import Company, Financials, StockPrice
+from app.database.models import Company, Financials, NewsArticle, StockPrice
 from app.etl.loaders.db_loader import DBLoader
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL")
@@ -151,3 +151,57 @@ class DBLoaderIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(financial_rows), 1)
         self.assertEqual(financial_rows[0].total_revenue, 550.0)
         self.assertEqual(financial_rows[0].net_income_to_common, 150.0)
+
+    async def test_upsert_news_articles_upserts_by_company_and_url(self) -> None:
+        async with self.session_factory() as session:
+            company = Company(symbol="AAPL", short_name="Apple")
+            session.add(company)
+            await session.commit()
+
+            inserted = await DBLoader.upsert_news_articles(
+                session,
+                [
+                    {
+                        "symbol": "AAPL",
+                        "title": "Apple launches product",
+                        "description": "New device announced",
+                        "url": "https://example.com/apple-1",
+                        "source_name": "Reuters",
+                        "published_at": date(2026, 6, 1),
+                        "sentiment": "positive",
+                        "sentiment_score": 0.92,
+                        "positive_score": 0.92,
+                        "negative_score": 0.03,
+                        "neutral_score": 0.05,
+                    }
+                ],
+            )
+
+            updated = await DBLoader.upsert_news_articles(
+                session,
+                [
+                    {
+                        "symbol": "AAPL",
+                        "title": "Apple launches product (updated)",
+                        "description": "Updated headline",
+                        "url": "https://example.com/apple-1",
+                        "source_name": "Reuters",
+                        "published_at": date(2026, 6, 1),
+                        "sentiment": "neutral",
+                        "sentiment_score": 0.55,
+                        "positive_score": 0.20,
+                        "negative_score": 0.25,
+                        "neutral_score": 0.55,
+                    }
+                ],
+            )
+
+            news_rows = (
+                await session.execute(select(NewsArticle).where(NewsArticle.company_id == company.id))
+            ).scalars().all()
+
+        self.assertEqual(inserted, 1)
+        self.assertEqual(updated, 1)
+        self.assertEqual(len(news_rows), 1)
+        self.assertEqual(news_rows[0].title, "Apple launches product (updated)")
+        self.assertEqual(news_rows[0].sentiment, "neutral")

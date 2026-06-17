@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database import Company, Financials, StockPrice
+from app.database import Company, Financials, NewsArticle, StockPrice
 
 
 class DBLoader:
@@ -114,3 +114,42 @@ class DBLoader:
 
         await session.commit()
         return count
+
+    @staticmethod
+    async def upsert_news_articles(session: AsyncSession, rows: Iterable[Dict]) -> int:
+        """Bulk upsert news articles by (company_id, url)."""
+        symbols = {row["symbol"] for row in rows if row.get("symbol")}
+        if not symbols:
+            return 0
+
+        stmt = select(Company).where(Company.symbol.in_(symbols))
+        res = await session.execute(stmt)
+        companies = {company.symbol: company.id for company in res.scalars().all()}
+
+        value_rows = []
+        for row in rows:
+            symbol = row.get("symbol")
+            company_id = companies.get(symbol)
+            if not company_id:
+                continue
+            row_data = {key: val for key, val in row.items() if key != "symbol"}
+            row_data["company_id"] = company_id
+            value_rows.append(row_data)
+
+        if not value_rows:
+            return 0
+
+        insert_stmt = pg_insert(NewsArticle).values(value_rows)
+        excluded = insert_stmt.excluded
+        update_cols = {
+            column.name: getattr(excluded, column.name)
+            for column in NewsArticle.__table__.columns
+            if column.name not in {"company_id", "url", "id"}
+        }
+        stmt = insert_stmt.on_conflict_do_update(
+            index_elements=[NewsArticle.company_id, NewsArticle.url],
+            set_=update_cols,
+        )
+        await session.execute(stmt)
+        await session.commit()
+        return len(value_rows)

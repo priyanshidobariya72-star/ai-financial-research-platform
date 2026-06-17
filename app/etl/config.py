@@ -9,6 +9,10 @@ ETL_CONFIG = {
     "retry_delay": 5,  # seconds
     "symbols": ["AAPL", "META", "MSFT"],
     "stock_price_lookback_days": 365,
+    "news_lookback_days": 7,
+    "news_max_articles": 10,
+    "news_lang": "en",
+    "news_country": "us",
     "log_file": "logs/etl_pipeline.log",
 }
 
@@ -29,3 +33,10 @@ def is_dry_run_enabled(default: bool = False) -> bool:
     if raw_value is None:
         return default
     return raw_value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def get_gnews_api_key() -> str:
+    api_key = os.getenv("GNEWS_API_KEY", "").strip()
+    if not api_key:
+        raise ValueError("GNEWS_API_KEY environment variable is required to fetch news")
+    return api_key

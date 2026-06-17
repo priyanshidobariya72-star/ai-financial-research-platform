@@ -9,9 +9,11 @@ import pandas as pd
 from app.etl.pipelines.company_pipeline import CompanyPipeline
 from app.etl.pipelines.financials_pipeline import FinancialsPipeline
 from app.etl.pipelines.market_data_pipeline import MarketDataPipeline
+from app.etl.pipelines.news_pipeline import NewsPipeline
 from app.etl.pipelines.stock_price_pipeline import StockPricePipeline
 from app.etl.transformers.company_transformer import CompanyTransformer
 from app.etl.transformers.financials_transformer import FinancialsTransformer
+from app.etl.transformers.news_transformer import NewsTransformer
 from app.etl.transformers.stock_price_transformer import StockPriceTransformer
 from app.etl.utils import run_with_retries
 
@@ -114,6 +116,24 @@ class TransformerTests(IsolatedAsyncioTestCase):
         self.assertEqual(transformed[0]["total_revenue"], 500.0)
         self.assertEqual(transformed[0]["total_debt"], 120.0)
         self.assertEqual(transformed[0]["financial_currency"], "USD")
+
+    async def test_news_transformer_cleans_raw_batch(self) -> None:
+        transformed = NewsTransformer().transform(
+            [
+                {
+                    "symbol": "AAPL",
+                    "title": "<b>Apple</b> update",
+                    "description": "Strong quarter",
+                    "url": "https://example.com/aapl",
+                    "publishedAt": "2026-06-01T10:00:00Z",
+                    "source": {"name": "Reuters"},
+                }
+            ]
+        )
+
+        self.assertEqual(len(transformed), 1)
+        self.assertEqual(transformed[0]["title"], "Apple update")
+        self.assertEqual(transformed[0]["source_name"], "Reuters")
 
 
 class PipelineTests(IsolatedAsyncioTestCase):
@@ -222,3 +242,51 @@ class PipelineTests(IsolatedAsyncioTestCase):
         self.assertEqual(result, 2)
         loader.assert_awaited_once()
         self.assertEqual(loader.await_args.args[1], transformed_rows)
+
+    async def test_news_pipeline_runs_cleaning_sentiment_and_load(self) -> None:
+        pipeline = NewsPipeline(["AAPL"])
+        raw_rows = [
+            {
+                "symbol": "AAPL",
+                "title": "Apple news",
+                "description": "Market update",
+                "url": "https://example.com/aapl",
+                "publishedAt": "2026-06-01T10:00:00Z",
+                "source": {"name": "Reuters"},
+            }
+        ]
+        cleaned_rows = [
+            {
+                "symbol": "AAPL",
+                "title": "Apple news",
+                "description": "Market update",
+                "url": "https://example.com/aapl",
+                "published_at": date(2026, 6, 1),
+                "source_name": "Reuters",
+            }
+        ]
+        enriched_rows = [{**cleaned_rows[0], "sentiment": "positive", "sentiment_score": 0.9}]
+
+        class _SessionFactory:
+            def __call__(self):
+                return self
+
+            async def __aenter__(self):
+                return object()
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+        loader = AsyncMock(return_value=1)
+
+        with (
+            patch("app.etl.pipelines.news_pipeline.run_with_retries", AsyncMock(return_value=raw_rows)),
+            patch.object(pipeline.transformer, "transform", Mock(return_value=cleaned_rows)),
+            patch("app.etl.pipelines.news_pipeline.enrich_article_with_sentiment", Mock(side_effect=enriched_rows)),
+            patch("app.etl.pipelines.news_pipeline.AsyncSessionLocal", _SessionFactory()),
+            patch("app.etl.pipelines.news_pipeline.DBLoader.upsert_news_articles", loader),
+        ):
+            result = await pipeline.run()
+
+        self.assertEqual(result, 1)
+        loader.assert_awaited_once()
