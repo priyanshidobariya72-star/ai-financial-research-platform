@@ -12,6 +12,8 @@ __pycache__/
 .eggs/
 dist/
 build/
+frontend/node_modules/
+frontend/dist/
 
 # Test and tooling caches
 .pytest_cache/

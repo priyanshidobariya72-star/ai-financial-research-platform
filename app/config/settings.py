@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from dotenv import load_dotenv
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -37,10 +38,21 @@ class Settings(BaseSettings):
     enable_docs: bool = True
     enable_redoc: bool = True
 
-    class Config:
-        env_file = str(DOTENV_PATH)
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    # Document RAG Configuration
+    rag_documents_dir: str = "data/documents"
+    chroma_persist_dir: str = "data/chroma"
+    chroma_collection_name: str = "financial_documents"
+    embedding_model_name: str = "BAAI/bge-small-en-v1.5"
+    rag_chunk_size: int = 1000
+    rag_chunk_overlap: int = 200
+    cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173,http://localhost:3000,http://127.0.0.1:3000"
+
+    model_config = ConfigDict(
+        env_file=str(DOTENV_PATH),
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
 
 settings = Settings()

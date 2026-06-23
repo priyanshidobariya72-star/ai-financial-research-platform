@@ -26,7 +26,7 @@ The platform leverages ETL pipelines, Retrieval-Augmented Generation (RAG), and 
 ```text
                           User
                             │
-                     Streamlit Frontend
+                      React Frontend
                             │
                          FastAPI
                             │
@@ -349,6 +349,36 @@ Request:
 
 ```http
 POST /upload
+Content-Type: multipart/form-data
+```
+
+## Document RAG Endpoints
+
+Upload and index a PDF:
+
+```http
+POST /rag/ingest
+Content-Type: application/json
+```
+
+```json
+{
+  "file_path": "data/documents/tesla_annual_report.pdf"
+}
+```
+
+Retrieve relevant chunks with citations:
+
+```http
+POST /rag/query
+Content-Type: application/json
+```
+
+```json
+{
+  "query": "What risks are mentioned in Tesla's annual report?",
+  "k": 4
+}
 ```
 
 ---
@@ -438,12 +468,28 @@ REDIS_PORT=
 uvicorn app.main:app --reload
 ```
 
----
-
-## Run Streamlit
+Document RAG dependencies:
 
 ```bash
-streamlit run frontend/streamlit_app.py
+pip install -r requirements.txt
+```
+
+The RAG pipeline uses:
+
+- `PyPDFLoader` for PDF extraction
+- `RecursiveCharacterTextSplitter` for chunking
+- `BAAI/bge-small-en-v1.5` via Hugging Face embeddings
+- `Chroma` for vector storage
+- per-chunk source metadata for citation support
+
+---
+
+## Run React Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
 ```
 
 ---
@@ -484,7 +530,7 @@ streamlit run frontend/streamlit_app.py
 
 ## Phase 5
 
-- [ ] Streamlit UI
+- [ ] React UI
 - [ ] Company Comparison
 
 ---

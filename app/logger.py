@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from pathlib import Path
 
 LOG_DIR = Path(__file__).resolve().parent.parent / "logs"
@@ -27,6 +28,14 @@ def get_file_handler(level: int = logging.INFO, log_file: Path | str | None = No
     return handler
 
 
+def get_stream_handler(level: int = logging.INFO) -> logging.Handler:
+    """Return a stream handler writing logs to stdout."""
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(level)
+    handler.setFormatter(DEFAULT_FORMATTER)
+    return handler
+
+
 def configure_logger(
     name: str = "ai_financial_research_platform",
     level: int = logging.INFO,
@@ -37,6 +46,11 @@ def configure_logger(
     logger.setLevel(level)
     if not any(isinstance(handler, logging.FileHandler) for handler in logger.handlers):
         logger.addHandler(get_file_handler(level=level, log_file=log_file))
+    if not any(
+        isinstance(handler, logging.StreamHandler) and not isinstance(handler, logging.FileHandler)
+        for handler in logger.handlers
+    ):
+        logger.addHandler(get_stream_handler(level=level))
     return logger
 
 
